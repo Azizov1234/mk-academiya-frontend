@@ -1,0 +1,167 @@
+name: Mobile Apps Build (Android & iOS)
+
+permissions:
+  actions: read
+  contents: write
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Verify Node version
+        run: |
+          node --version
+          npm --version
+
+      - name: Install Dependencies
+        working-directory: ./frontend
+        run: |
+          rm -rf package-lock.json node_modules
+          npm install --include=optional
+
+      - name: Build Next.js (Web)
+        working-directory: ./frontend
+        run: npm run build
+        env:
+          CAPACITOR_EXPORT: 'true'
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '21'
+
+      - name: Sync Capacitor Android
+        working-directory: ./frontend
+        run: |
+          if [ ! -f out/index.html ]; then
+            CAPACITOR_EXPORT=true npm run build
+          fi
+          npx cap sync android
+
+      - name: Build APK (Debug)
+        working-directory: ./frontend/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Prepare Android release asset
+        working-directory: ./frontend
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk MK_Academy_Android.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: frontend/MK_Academy_Android.apk
+
+  build-ios:
+    name: Build iOS App
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Verify Node version
+        run: |
+          node --version
+          npm --version
+          which node
+
+      - name: Install Dependencies
+        working-directory: ./frontend
+        run: |
+          rm -rf package-lock.json node_modules
+          npm install --include=optional
+
+      - name: Build Next.js (Web)
+        working-directory: ./frontend
+        run: npm run build
+        env:
+          CAPACITOR_EXPORT: 'true'
+
+      - name: Sync Capacitor iOS
+        working-directory: ./frontend
+        run: |
+          if [ ! -f out/index.html ]; then
+            CAPACITOR_EXPORT=true npm run build
+          fi
+          export PATH="$(dirname $(which node)):$PATH"
+          npx cap sync ios
+
+      - name: Resolve Swift Packages
+        working-directory: ./frontend/ios/App
+        run: |
+          xcodebuild -project App.xcodeproj -scheme App -resolvePackageDependencies
+
+      - name: Build iOS App (Unsigned)
+        working-directory: ./frontend/ios/App
+        run: |
+          xcodebuild -project App.xcodeproj -scheme App -configuration Release -sdk iphoneos -derivedDataPath ./build clean build CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
+
+      - name: Prepare IPA (Payload format)
+        working-directory: ./frontend/ios/App
+        run: |
+          mkdir -p Payload
+          cp -r build/Build/Products/Release-iphoneos/App.app Payload/
+          zip -r MK_Academy_iOS.ipa Payload
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa
+          path: frontend/ios/App/MK_Academy_iOS.ipa
+
+  publish-latest-release:
+    name: Publish latest mobile release
+    needs: [build-android, build-ios]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download mobile artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+
+      - name: Publish release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: frontend-mobile-latest
+        run: |
+          cat > RELEASE_NOTES.md <<EOF
+          Latest frontend mobile builds.
+
+          Commit: $GITHUB_SHA
+          Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          EOF
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" --title "Frontend mobile latest" --notes-file RELEASE_NOTES.md
+          else
+            gh release create "$RELEASE_TAG" --title "Frontend mobile latest" --notes-file RELEASE_NOTES.md
+          fi
+
+          gh release upload "$RELEASE_TAG" \
+            release-assets/android-apk/MK_Academy_Android.apk \
+            release-assets/ios-ipa/MK_Academy_iOS.ipa \
+            --clobber

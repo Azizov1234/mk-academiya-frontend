@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MK Academy</string>
+    <string name="title_activity_main">MK Academy</string>
+    <string name="package_name">com.mk.academy</string>
+    <string name="custom_url_scheme">com.mk.academy</string>
+</resources>

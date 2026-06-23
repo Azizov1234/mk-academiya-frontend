@@ -1,0 +1,74 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    paths:
+      - 'frontend/**'
+  pull_request:
+    branches: [ "main", "master" ]
+    paths:
+      - 'frontend/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        role: [student, mentor, admin, superadmin]
+    defaults:
+      run:
+        working-directory: ./frontend
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: './frontend/package.json'
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Build Next.js (Static Export - ${{ matrix.role }})
+        run: npm run build
+        env:
+          CAPACITOR_EXPORT: 'true'
+          NEXT_PUBLIC_APP_ROLE: ${{ matrix.role }}
+
+      - name: Capacitor Sync (${{ matrix.role }})
+        run: |
+          if [ ! -f out/index.html ]; then
+            CAPACITOR_EXPORT=true npm run build
+          fi
+          npx cap sync android
+        env:
+          CAPACITOR_EXPORT: 'true'
+          NEXT_PUBLIC_APP_ROLE: ${{ matrix.role }}
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '21'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build APK (${{ matrix.role }})
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+        env:
+          NEXT_PUBLIC_APP_ROLE: ${{ matrix.role }}
+
+      - name: Upload APK (${{ matrix.role }})
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-${{ matrix.role }}-debug
+          path: frontend/android/app/build/outputs/apk/debug/app-debug.apk
