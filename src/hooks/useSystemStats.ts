@@ -22,6 +22,7 @@ export function useSystemStats(enabled = true) {
     },
     request,
     requestKey: 'system:stats',
+    staleTimeMs: 120_000,
   });
 }
 
@@ -33,5 +34,6 @@ export function useSystemHealth(enabled = true) {
     initialData: null,
     request,
     requestKey: 'system:health',
+    staleTimeMs: 300_000,
   });
 }

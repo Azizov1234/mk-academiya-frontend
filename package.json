@@ -3,7 +3,9 @@
   "private": true,
   "version": "0.0.1",
   "scripts": {
+    "predev": "node scripts/clean-next-cache.mjs",
     "dev": "next dev",
+    "clean:next": "node scripts/clean-next-cache.mjs --force",
     "build:next": "next build",
     "build": "node scripts/run-build.mjs",
     "typecheck": "tsc --noEmit --pretty false",

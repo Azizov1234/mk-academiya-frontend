@@ -54,7 +54,9 @@
     "gamification": "Gamification",
     "books": "Книги",
     "rating": "Рейтинг",
-    "profile": "Профиль"
+    "profile": "Профиль",
+    "telegramBot": "Telegram Бот",
+    "questionsAnalytics": "Аналитика вопросов"
   },
   "BottomNav": {
     "dashboard": "Панель",
@@ -77,6 +79,8 @@
     "books": "Книги",
     "rating": "Рейтинг",
     "profile": "Профиль",
+    "telegramBot": "Telegram Бот",
+    "questionsAnalytics": "Аналитика вопросов",
     "more": "Ещё"
   },
   "ExamCard": {

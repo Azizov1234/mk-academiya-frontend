@@ -8,7 +8,6 @@ import { Sidebar } from './components/Sidebar';
 import { OfflineStatusBanner } from './components/OfflineStatusBanner';
 import { GlobalApiNotice } from './components/GlobalApiNotice';
 import { useAuth } from '@/hooks/useAuth';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useLocale } from 'next-intl';
 import { stripLocaleFromPathname } from '@/i18n/pathname';
 import { localizePath } from '@/i18n/localizedPath';
@@ -91,21 +90,7 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
         {!hideNav && <Header role={role} />}
         <OfflineStatusBanner />
         <main className={`min-w-0 w-full flex-1 ${!hideNav ? 'mx-auto max-w-7xl pb-nav-safe pt-5 sm:pt-7 lg:pt-10' : ''}`}>
-          {nativeApp ? (
-            <div>{children}</div>
-          ) : (
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={pathname}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.3, ease: 'easeOut' }}
-              >
-                {children}
-              </motion.div>
-            </AnimatePresence>
-          )}
+          {children}
         </main>
       </div>
       <GlobalApiNotice />

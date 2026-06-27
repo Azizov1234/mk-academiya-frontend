@@ -50,6 +50,22 @@ function parseRequestData<T>(config: RequestConfig): T {
   return data as T;
 }
 
+function parseRequestBody<T>(config: RequestConfig): T {
+  const { data } = config;
+
+  if (typeof FormData !== 'undefined' && data instanceof FormData) {
+    const body: Record<string, unknown> = {};
+
+    data.forEach((value, key) => {
+      body[key] = typeof value === 'string' ? value : null;
+    });
+
+    return body as T;
+  }
+
+  return parseRequestData<T>(config);
+}
+
 function readHeader(config: RequestConfig, name: string) {
   const headers = config.headers as
     | ({ get?: (headerName: string) => string | null | undefined } & Record<string, string | undefined>)
@@ -462,6 +478,155 @@ async function handleRequest(config: RequestConfig) {
     }
 
     return makeResponse(config, mapProfile(target));
+  }
+
+  if (method === 'post' && segments[0] === 'users' && segments[1] === 'create' && segments[2]) {
+    const roleByPath: Record<string, MockUser['role']> = {
+      admin: 'ADMIN',
+      teacher: 'TEACHER',
+      student: 'STUDENT',
+    };
+    const targetRole = roleByPath[segments[2]];
+    const body = parseRequestBody<{
+      phone?: string;
+      passwordHash?: string;
+      fullName?: string;
+      cefrLevel?: string;
+    }>(config);
+
+    if (!targetRole) {
+      throw makeError(config, 404, 'Route not found');
+    }
+
+    if (!body.phone?.trim() || !body.fullName?.trim() || !body.passwordHash?.trim()) {
+      throw makeError(config, 400, 'Required user fields are missing');
+    }
+
+    if (store.users.some((user) => normalizePhone(user.phone) === normalizePhone(body.phone || ''))) {
+      throw makeError(config, 400, 'User already exists');
+    }
+
+    const user: MockUser = {
+      id: Math.max(...store.users.map((item) => item.id), 0) + 1,
+      fullName: body.fullName.trim(),
+      email: '',
+      phone: body.phone.trim(),
+      role: targetRole,
+      password: body.passwordHash.trim(),
+      avatarUrl: null,
+      cefrLevel: body.cefrLevel || null,
+      language: 'UZ',
+      timezone: 'Asia/Tashkent',
+      dateOfBirth: null,
+      groupIds: [],
+      createdAt: new Date().toISOString(),
+      isActive: true,
+    };
+
+    store.users.push(user);
+    return makeResponse(config, {
+      success: true,
+      message: `${targetRole} created successfully`,
+      data: user,
+    });
+  }
+
+  if (method === 'patch' && segments[0] === 'users' && segments[1] === 'active' && segments[2]) {
+    const userId = Number(segments[2]);
+    const target = store.users.find((user) => user.id === userId);
+
+    if (!target) {
+      throw makeError(config, 404, 'User not found');
+    }
+
+    target.isActive = true;
+    return makeResponse(config, {
+      success: true,
+      message: 'User activated successfully',
+      data: target,
+    });
+  }
+
+  if (method === 'get' && segments[0] === 'users' && segments[1]) {
+    const userId = Number(segments[1]);
+    const target = store.users.find((user) => user.id === userId);
+
+    if (!target) {
+      throw makeError(config, 404, 'User not found');
+    }
+
+    return makeResponse(config, target);
+  }
+
+  if (method === 'patch' && segments[0] === 'users' && segments[1]) {
+    const userId = Number(segments[1]);
+    const target = store.users.find((user) => user.id === userId);
+    const body = parseRequestBody<{
+      phone?: string;
+      passwordHash?: string;
+      fullName?: string;
+      cefrLevel?: string;
+      avatarUrl?: string | null;
+      isActive?: boolean;
+    }>(config);
+
+    if (!target) {
+      throw makeError(config, 404, 'User not found');
+    }
+
+    if (body.phone?.trim() && normalizePhone(body.phone) !== normalizePhone(target.phone)) {
+      const phoneTaken = store.users.some(
+        (user) => user.id !== userId && normalizePhone(user.phone) === normalizePhone(body.phone || ''),
+      );
+
+      if (phoneTaken) {
+        throw makeError(config, 400, 'User already exists');
+      }
+
+      target.phone = body.phone.trim();
+    }
+
+    if (body.fullName?.trim()) {
+      target.fullName = body.fullName.trim();
+    }
+
+    if (body.passwordHash?.trim()) {
+      target.password = body.passwordHash.trim();
+    }
+
+    if (body.cefrLevel !== undefined) {
+      target.cefrLevel = body.cefrLevel || null;
+    }
+
+    if (body.avatarUrl !== undefined) {
+      target.avatarUrl = body.avatarUrl || null;
+    }
+
+    if (typeof body.isActive === 'boolean') {
+      target.isActive = body.isActive;
+    }
+
+    return makeResponse(config, {
+      success: true,
+      message: 'User updated successfully',
+      data: target,
+    });
+  }
+
+  if (method === 'delete' && segments[0] === 'users' && segments[1]) {
+    const userId = Number(segments[1]);
+    const target = store.users.find((user) => user.id === userId);
+
+    if (!target) {
+      throw makeError(config, 404, 'User not found');
+    }
+
+    target.isActive = false;
+    return makeResponse(config, {
+      success: true,
+      message: 'User deleted successfully',
+      data: target,
+    });
   }
 
   if (method === 'get' && pathname === '/user-profiles/profile/me') {

@@ -80,7 +80,6 @@ export function Sidebar({ role }: SidebarProps) {
                 <Link
                   key={item.path}
                   href={localizedHref}
-                  prefetch={false}
                   className={`flex items-center gap-4 border px-5 py-3.5 rounded-lg transition-all duration-200 group ${
                     isActive
                       ? "border-[var(--app-primary)] bg-[var(--app-primary)] text-white shadow-sm shadow-[var(--app-primary)]/20"

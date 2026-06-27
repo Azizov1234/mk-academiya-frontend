@@ -54,7 +54,9 @@
     "gamification": "Gamification",
     "books": "Books",
     "rating": "Rating",
-    "profile": "Profile"
+    "profile": "Profile",
+    "telegramBot": "Telegram Bot",
+    "questionsAnalytics": "Question Analytics"
   },
   "BottomNav": {
     "dashboard": "Dashboard",
@@ -77,6 +79,8 @@
     "books": "Books",
     "rating": "Rating",
     "profile": "Profile",
+    "telegramBot": "Telegram Bot",
+    "questionsAnalytics": "Question Analytics",
     "more": "More"
   },
   "ExamCard": {

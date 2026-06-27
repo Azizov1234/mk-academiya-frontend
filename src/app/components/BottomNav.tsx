@@ -83,7 +83,6 @@ export function BottomNav({ role }: BottomNavProps) {
                       <Link
                         key={item.path}
                         href={localizedHref}
-                        prefetch={false}
                         onClick={() => setShowMore(false)}
                         className={`app-touch flex min-h-[56px] flex-col items-center justify-center gap-1 border border-transparent px-2 transition-all duration-300 active:scale-95 ${
                           isActive
@@ -145,7 +144,6 @@ export function BottomNav({ role }: BottomNavProps) {
                 <Link
                   key={item.path}
                   href={localizedHref}
-                  prefetch={false}
                   className={`app-touch flex min-h-[48px] min-w-0 flex-1 flex-col items-center justify-center gap-1 border border-transparent px-1 transition-all duration-300 active:scale-95 ${
                     isActive
                       ? "border-[var(--app-primary)] bg-[var(--app-primary)] text-white"

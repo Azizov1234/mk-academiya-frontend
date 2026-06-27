@@ -12,6 +12,8 @@ import {
   Dumbbell,
   Trophy,
   Users,
+  Bot,
+  BarChart4,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -38,6 +40,8 @@ const ROLE_NAVIGATION: Record<AppRole, NavigationConfig> = {
       { path: '/gamification', icon: Trophy, labelKey: 'gamification' },
       { path: '/books', icon: Book, labelKey: 'books' },
       { path: '/tests', icon: ClipboardCheck, labelKey: 'tests' },
+      { path: '/bot', icon: Bot, labelKey: 'telegramBot' },
+      { path: '/questions-analytics', icon: BarChart4, labelKey: 'questionsAnalytics' },
       { path: '/system', icon: ShieldCheck, labelKey: 'system' },
       { path: '/settings', icon: SettingsIcon, labelKey: 'settings' },
     ],
@@ -66,6 +70,8 @@ const ROLE_NAVIGATION: Record<AppRole, NavigationConfig> = {
       { path: '/gamification', icon: Trophy, labelKey: 'gamification' },
       { path: '/books', icon: Book, labelKey: 'books' },
       { path: '/tests', icon: ClipboardCheck, labelKey: 'tests' },
+      { path: '/bot', icon: Bot, labelKey: 'telegramBot' },
+      { path: '/questions-analytics', icon: BarChart4, labelKey: 'questionsAnalytics' },
       { path: '/results', icon: LayoutGrid, labelKey: 'reports' },
       { path: '/settings', icon: SettingsIcon, labelKey: 'settings' },
     ],
@@ -92,6 +98,7 @@ const ROLE_NAVIGATION: Record<AppRole, NavigationConfig> = {
       { path: '/gamification', icon: Trophy, labelKey: 'gamification' },
       { path: '/books', icon: Book, labelKey: 'books' },
       { path: '/tests', icon: ClipboardCheck, labelKey: 'tests' },
+      { path: '/questions-analytics', icon: BarChart4, labelKey: 'questionsAnalytics' },
       { path: '/results', icon: LayoutGrid, labelKey: 'results' },
       { path: '/settings', icon: SettingsIcon, labelKey: 'settings' },
     ],

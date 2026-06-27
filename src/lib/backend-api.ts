@@ -78,6 +78,15 @@ export type UserCreatePayload = {
   avatarUrl?: File | null;
 };
 
+export type UserUpdatePayload = {
+  phone?: string;
+  passwordHash?: string;
+  fullName?: string;
+  cefrLevel?: CefrLevel | "";
+  avatarUrl?: string | null;
+  isActive?: boolean;
+};
+
 export type CoursePayload = {
   title: string;
   level: CefrLevel;
@@ -517,6 +526,11 @@ export async function createAdmin(payload: UserCreatePayload) {
       headers: { "Content-Type": "multipart/form-data" },
     }
   );
+  return unwrapApiData<any>(response.data);
+}
+
+export async function updateUser(id: number, payload: UserUpdatePayload) {
+  const response = await api.patch(`/users/${id}`, payload);
   return unwrapApiData<any>(response.data);
 }
 
@@ -1263,12 +1277,12 @@ export function normalizeQuestionOptionItems(
   const decodedOptions =
     typeof options === "string"
       ? (() => {
-          try {
-            return JSON.parse(options);
-          } catch {
-            return options;
-          }
-        })()
+        try {
+          return JSON.parse(options);
+        } catch {
+          return options;
+        }
+      })()
       : options;
 
   if (Array.isArray(decodedOptions)) {
@@ -1337,15 +1351,13 @@ export function validateQuestionPayload(
     options.forEach((option, optionIndex) => {
       if (option.label.length !== 1) {
         errors.push(
-          `${label}: ${
-            optionIndex + 1
+          `${label}: ${optionIndex + 1
           }-variant nomi faqat 1 ta belgidan iborat bo'lishi kerak`
         );
       }
       if (!option.value.trim()) {
         errors.push(
-          `${label}: ${
-            option.label || optionIndex + 1
+          `${label}: ${option.label || optionIndex + 1
           }-variant qiymati kiritilishi kerak`
         );
       }
@@ -1698,4 +1710,112 @@ export async function markAllNotificationsAsRead() {
 export async function removeNotification(id: number) {
   const response = await api.delete(`/notifications/${id}`);
   return unwrapApiData<any>(response.data);
+}
+
+// ── Telegram Bot Management ──────────────────────────────────────────────────
+
+export type BotStats = {
+  usersCount: number;
+  leadsCount: number;
+  coursesCount: number;
+  resultsCount: number;
+};
+
+export type BotCenterInfo = {
+  id?: number;
+  phone: string;
+  address: string;
+  schedule: string;
+  isActive?: boolean;
+};
+
+export type BotCourse = {
+  id: number;
+  title: string;
+  level: string;
+  description?: string;
+  isActive: boolean;
+};
+
+export type BotLead = {
+  id: number;
+  fullName: string;
+  phone: string;
+  message?: string;
+  createdAt: string;
+};
+
+export async function getBotStats() {
+  const response = await api.get('/bot/admin/stats');
+  return unwrapApiData<BotStats>(response.data);
+}
+
+export async function getBotAdmins() {
+  const response = await api.get('/bot/admin/users');
+  return unwrapApiData<any[]>(response.data) ?? [];
+}
+
+export async function createBotAdmin(payload: { phone: string; fullName: string }) {
+  const response = await api.post('/bot/admin/users', payload);
+  return unwrapApiData<any>(response.data);
+}
+
+export async function getBotLeads(limit = 10) {
+  const response = await api.get('/bot/leads', { params: { limit } });
+  return unwrapApiData<BotLead[]>(response.data) ?? [];
+}
+
+export async function getBotCenterInfo() {
+  const response = await api.get('/bot/center-info');
+  return unwrapApiData<BotCenterInfo>(response.data);
+}
+
+export async function updateBotCenterInfo(payload: BotCenterInfo) {
+  const response = await api.put('/bot/center-info', payload);
+  return unwrapApiData<BotCenterInfo>(response.data);
+}
+
+export async function getBotCourses() {
+  const response = await api.get('/bot/courses');
+  return unwrapApiData<BotCourse[]>(response.data) ?? [];
+}
+
+export async function createBotCourse(payload: Omit<BotCourse, 'id' | 'isActive'>) {
+  const response = await api.post('/bot/courses', payload);
+  return unwrapApiData<BotCourse>(response.data);
+}
+
+export async function updateBotCourse(id: number, payload: Partial<BotCourse>) {
+  const response = await api.patch(`/bot/courses/${id}`, payload);
+  return unwrapApiData<BotCourse>(response.data);
+}
+
+// ── Question Analytics ────────────────────────────────────────────────────────
+
+export type QuestionAnalyticsItem = {
+  questionId: number;
+  testId: number;
+  questionText: string;
+  type: string;
+  inputType: string;
+  points: number;
+  difficulty: number;
+  skill?: string | null;
+  totalAttempts: number;
+  correctCount: number;
+  incorrectCount: number;
+  accuracyPercent: number;
+  avgTimeSeconds: number;
+};
+
+export async function getQuestionAnalytics(testId?: number) {
+  const params: Record<string, unknown> = {};
+  if (testId) params.testId = testId;
+  const response = await api.get('/questions/analytics', { params });
+  return unwrapApiData<QuestionAnalyticsItem[]>(response.data) ?? [];
+}
+
+export async function getQuestionAnalyticsById(questionId: number) {
+  const response = await api.get(`/questions/analytics/${questionId}`);
+  return unwrapApiData<QuestionAnalyticsItem>(response.data);
 }

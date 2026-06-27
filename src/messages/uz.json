@@ -54,7 +54,9 @@
     "gamification": "Gamification",
     "books": "Kitoblar",
     "rating": "Reyting",
-    "profile": "Profil"
+    "profile": "Profil",
+    "telegramBot": "Telegram Bot",
+    "questionsAnalytics": "Savollar tahlili"
   },
   "BottomNav": {
     "dashboard": "Boshqaruv",
@@ -77,6 +79,8 @@
     "books": "Kitoblar",
     "rating": "Reyting",
     "profile": "Profil",
+    "telegramBot": "Telegram Bot",
+    "questionsAnalytics": "Savollar tahlili",
     "more": "Ko'proq"
   },
   "ExamCard": {

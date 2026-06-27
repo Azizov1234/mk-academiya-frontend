@@ -1,11 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   CheckCircle2,
   Eye,
   Filter,
   Loader2,
+  Pencil,
+  Save,
   Search,
   Shield,
   UserPlus,
@@ -23,8 +26,10 @@ import {
   getUserById,
   type CefrLevel,
   type UserDirectoryRole,
+  type UserUpdatePayload,
   CEFR_LEVELS,
   removeUser,
+  updateUser,
 } from "@/lib/backend-api";
 import { hasRoleCapability, isRoleAllowedForPath } from "@/lib/role-access";
 import {
@@ -52,6 +57,14 @@ const EMPTY_FORM = {
   cefrLevel: "",
 };
 
+const EMPTY_UPDATE_FORM = {
+  ...EMPTY_FORM,
+  isActive: true,
+};
+
+const MODAL_OVERLAY_CLASS =
+  "fixed inset-0 z-[130] flex items-start justify-center overflow-y-auto bg-[var(--app-primary)]/20 px-3 py-8 pt-20 backdrop-blur-md sm:px-4 sm:pt-24 lg:left-72";
+
 export default function UsersPage() {
   const t = useTranslations("UsersPage");
   const uiT = useTranslations("UiStates");
@@ -69,22 +82,47 @@ export default function UsersPage() {
   const [activeFilter, setActiveFilter] = useState<boolean | undefined>(
     undefined
   );
+  const [currentPage, setCurrentPage] = useState(1);
+  const [modalRoot, setModalRoot] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, roleFilter, activeFilter]);
+
+  useEffect(() => {
+    setModalRoot(document.body);
+  }, []);
+
   const [createRole, setCreateRole] = useState<CreateRole | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [editingUser, setEditingUser] = useState<any>(null);
+  const [updateForm, setUpdateForm] = useState(EMPTY_UPDATE_FORM);
+  const hasModalOpen = Boolean(createRole || editingUser || selectedUser);
+
+  useEffect(() => {
+    if (!hasModalOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [hasModalOpen]);
 
   const query = useMemo(
     () => ({
       fullName: searchTerm,
       user: roleFilter,
       isActive: activeFilter,
-      page: 1,
+      page: currentPage,
       limit: 20,
     }),
-    [activeFilter, roleFilter, searchTerm]
+    [activeFilter, roleFilter, searchTerm, currentPage]
   );
 
   const {
@@ -152,6 +190,56 @@ export default function UsersPage() {
       );
     } finally {
       setDetailLoading(false);
+    }
+  }
+
+  function handleOpenEdit(user: any) {
+    setMutationError(null);
+    setEditingUser(user);
+    setUpdateForm({
+      fullName: user.fullName || "",
+      phone: user.phone || "",
+      passwordHash: "",
+      cefrLevel: user.cefrLevel || "",
+      isActive: user.isActive !== false,
+    });
+  }
+
+  async function handleUpdateUser() {
+    if (!editingUser) return;
+
+    try {
+      setSubmitting(true);
+      setMutationError(null);
+
+      const payload: UserUpdatePayload = {
+        fullName: updateForm.fullName,
+        phone: updateForm.phone,
+        cefrLevel: (updateForm.cefrLevel || undefined) as
+          | CefrLevel
+          | undefined,
+        isActive: updateForm.isActive,
+      };
+
+      if (updateForm.passwordHash.trim()) {
+        payload.passwordHash = updateForm.passwordHash.trim();
+      }
+
+      await updateUser(editingUser.id, payload);
+      if (selectedUser?.id === editingUser.id) {
+        setSelectedUser(null);
+      }
+      setEditingUser(null);
+      setUpdateForm(EMPTY_UPDATE_FORM);
+      await refetch();
+    } catch (updateError) {
+      setMutationError(
+        updateError instanceof Error
+          ? updateError.message
+          : "Foydalanuvchini yangilab bo'lmadi"
+      );
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -298,7 +386,8 @@ export default function UsersPage() {
           description={t("emptyDescription")}
         />
       ) : (
-        <div className="grid grid-cols-1 gap-4 pb-20 xl:grid-cols-2">
+        <>
+          <div className="grid grid-cols-1 gap-4 pb-20 xl:grid-cols-2">
           {users.map((user: any, index: number) => (
             <div
               key={user.id || index}
@@ -340,7 +429,13 @@ export default function UsersPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div
+                className={
+                  canManageUsers
+                    ? "grid grid-cols-1 gap-2 sm:grid-cols-3"
+                    : "grid grid-cols-2 gap-2"
+                }
+              >
                 <button
                   onClick={() => void handleOpenDetails(user.id)}
                   className="flex items-center justify-center gap-2 border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-3 text-[11px] font-black uppercase tracking-widest text-[var(--app-text)] transition-transform active:scale-95"
@@ -354,19 +449,29 @@ export default function UsersPage() {
                 </button>
 
                 {canManageUsers ? (
-                  <button
-                    onClick={() => void handleToggleActive(user)}
-                    className={`flex items-center justify-center gap-2 px-4 py-3 text-[11px] font-black uppercase tracking-widest text-white transition-transform active:scale-95 ${
-                      user.isActive ? "bg-red-500" : "bg-blue-500"
-                    }`}
-                  >
-                    {user.isActive ? (
-                      <XCircle size={14} />
-                    ) : (
-                      <CheckCircle2 size={14} />
-                    )}
-                    {user.isActive ? "O'chirish" : "Faollashtirish"}
-                  </button>
+                  <>
+                    <button
+                      onClick={() => handleOpenEdit(user)}
+                      className="flex items-center justify-center gap-2 border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-3 text-[11px] font-black uppercase tracking-widest text-[var(--app-text)] transition-transform active:scale-95"
+                    >
+                      <Pencil size={14} />
+                      Tahrirlash
+                    </button>
+
+                    <button
+                      onClick={() => void handleToggleActive(user)}
+                      className={`flex items-center justify-center gap-2 px-4 py-3 text-[11px] font-black uppercase tracking-widest text-white transition-transform active:scale-95 ${
+                        user.isActive ? "bg-red-500" : "bg-blue-500"
+                      }`}
+                    >
+                      {user.isActive ? (
+                        <XCircle size={14} />
+                      ) : (
+                        <CheckCircle2 size={14} />
+                      )}
+                      {user.isActive ? "O'chirish" : "Faollashtirish"}
+                    </button>
+                  </>
                 ) : (
                   <div className="flex items-center justify-center gap-2 border border-[var(--app-border)] bg-[var(--app-surface-soft)] px-4 py-3 text-[11px] font-black uppercase tracking-widest text-[var(--app-muted)]">
                     <Shield size={14} />
@@ -377,11 +482,34 @@ export default function UsersPage() {
             </div>
           ))}
         </div>
+        <div className="mt-8 flex items-center justify-between border-t border-[var(--app-border)] pt-6 pb-20">
+          <button
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+            className="flex items-center justify-center gap-2 border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-2.5 text-xs font-black uppercase tracking-widest text-[var(--app-text)] transition disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[var(--app-surface-soft)] active:scale-95"
+          >
+            ← Orqaga
+          </button>
+          <span className="text-xs font-black uppercase tracking-widest text-[var(--app-muted)]">
+            Sahifa {currentPage}
+          </span>
+          <button
+            disabled={users.length < 20}
+            onClick={() => setCurrentPage((prev) => prev + 1)}
+            className="flex items-center justify-center gap-2 border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-2.5 text-xs font-black uppercase tracking-widest text-[var(--app-text)] transition disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[var(--app-surface-soft)] active:scale-95"
+          >
+            Oldinga →
+          </button>
+        </div>
+      </>
       )}
 
-      {createRole ? (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[var(--app-primary)]/20 backdrop-blur-md px-3 sm:px-4">
-          <div className="w-full max-w-md rounded-[20px] border border-[var(--app-border)] bg-[var(--app-surface)] p-4 shadow-2xl sm:rounded-[26px] sm:p-6">
+      {modalRoot
+        ? createPortal(
+            <>
+              {createRole ? (
+        <div className={MODAL_OVERLAY_CLASS}>
+          <div className="max-h-[calc(100dvh-7rem)] w-full max-w-md overflow-y-auto rounded-[20px] border border-[var(--app-border)] bg-[var(--app-surface)] p-4 shadow-2xl sm:rounded-[26px] sm:p-6">
             <div className="mb-5 flex items-center justify-between">
               <div>
                 <h3 className="text-xl font-black tracking-tight text-[var(--app-text)]">
@@ -477,9 +605,127 @@ export default function UsersPage() {
         </div>
       ) : null}
 
-      {selectedUser ? (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[var(--app-primary)]/20 backdrop-blur-md px-3 sm:px-4">
-          <div className="w-full max-w-lg rounded-[20px] border border-[var(--app-border)] bg-[var(--app-surface)] p-4 shadow-2xl sm:rounded-[26px] sm:p-6">
+              {editingUser ? (
+        <div className={MODAL_OVERLAY_CLASS}>
+          <div className="max-h-[calc(100dvh-7rem)] w-full max-w-md overflow-y-auto rounded-[20px] border border-[var(--app-border)] bg-[var(--app-surface)] p-4 shadow-2xl sm:rounded-[26px] sm:p-6">
+            <div className="mb-5 flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-black tracking-tight text-[var(--app-text)]">
+                  Foydalanuvchini tahrirlash
+                </h3>
+                <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-[var(--app-muted)]">
+                  {editingUser.role}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setEditingUser(null);
+                  setUpdateForm(EMPTY_UPDATE_FORM);
+                }}
+                className="rounded-[14px] bg-[var(--app-surface-soft)] p-3 text-[var(--app-muted)]"
+              >
+                <XCircle size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <input
+                value={updateForm.fullName}
+                onChange={(event) =>
+                  setUpdateForm((current) => ({
+                    ...current,
+                    fullName: event.target.value,
+                  }))
+                }
+                placeholder="Full name"
+                className="w-full rounded-[16px] border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-3 text-sm font-semibold"
+              />
+              <input
+                value={updateForm.phone}
+                onChange={(event) =>
+                  setUpdateForm((current) => ({
+                    ...current,
+                    phone: event.target.value,
+                  }))
+                }
+                placeholder="+998901234567"
+                className="w-full rounded-[16px] border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-3 text-sm font-semibold"
+              />
+              <input
+                value={updateForm.passwordHash}
+                onChange={(event) =>
+                  setUpdateForm((current) => ({
+                    ...current,
+                    passwordHash: event.target.value,
+                  }))
+                }
+                placeholder="Yangi parol (ixtiyoriy)"
+                type="password"
+                className="w-full rounded-[16px] border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-3 text-sm font-semibold"
+              />
+              <select
+                value={updateForm.cefrLevel}
+                onChange={(event) =>
+                  setUpdateForm((current) => ({
+                    ...current,
+                    cefrLevel: event.target.value,
+                  }))
+                }
+                className="w-full rounded-[16px] border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-3 text-sm font-semibold"
+              >
+                <option value="">CEFR level</option>
+                {CEFR_LEVELS.map((level) => (
+                  <option key={level} value={level}>
+                    {level}
+                  </option>
+                ))}
+              </select>
+              <label className="flex items-center gap-3 rounded-[16px] border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-3 text-sm font-bold text-[var(--app-text)]">
+                <input
+                  type="checkbox"
+                  checked={updateForm.isActive}
+                  onChange={(event) =>
+                    setUpdateForm((current) => ({
+                      ...current,
+                      isActive: event.target.checked,
+                    }))
+                  }
+                  className="h-4 w-4 accent-[var(--app-primary)]"
+                />
+                Faol
+              </label>
+            </div>
+
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+              <button
+                onClick={() => {
+                  setEditingUser(null);
+                  setUpdateForm(EMPTY_UPDATE_FORM);
+                }}
+                className="flex-1 rounded-[16px] border border-[var(--app-border)] px-4 py-3 text-[11px] font-black uppercase tracking-widest text-[var(--app-muted)]"
+              >
+                Bekor qilish
+              </button>
+              <button
+                onClick={() => void handleUpdateUser()}
+                disabled={submitting}
+                className="flex flex-1 items-center justify-center gap-2 rounded-[16px] bg-[var(--app-primary)] px-4 py-3 text-[11px] font-black uppercase tracking-widest text-white disabled:opacity-60"
+              >
+                {submitting ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Save size={14} />
+                )}
+                Yangilash
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+              {selectedUser ? (
+        <div className={MODAL_OVERLAY_CLASS}>
+          <div className="max-h-[calc(100dvh-7rem)] w-full max-w-lg overflow-y-auto rounded-[20px] border border-[var(--app-border)] bg-[var(--app-surface)] p-4 shadow-2xl sm:rounded-[26px] sm:p-6">
             <div className="mb-5 flex items-center justify-between">
               <div>
                 <h3 className="text-xl font-black tracking-tight text-[var(--app-text)]">
@@ -552,7 +798,11 @@ export default function UsersPage() {
             ) : null}
           </div>
         </div>
-      ) : null}
+              ) : null}
+            </>,
+            modalRoot
+          )
+        : null}
     </PageShell>
   );
 }
